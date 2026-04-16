@@ -16,7 +16,13 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+
 from .views import TeamViewSet, UserViewSet, ActivityViewSet, LeaderboardViewSet, WorkoutViewSet, api_root
+import os
+from rest_framework.settings import api_settings
+from rest_framework.reverse import reverse
+from rest_framework.response import Response
+from rest_framework.decorators import api_view
 
 router = DefaultRouter()
 router.register(r'teams', TeamViewSet, basename='team')
@@ -25,8 +31,27 @@ router.register(r'activities', ActivityViewSet, basename='activity')
 router.register(r'leaderboard', LeaderboardViewSet, basename='leaderboard')
 router.register(r'workouts', WorkoutViewSet, basename='workout')
 
+
+
+# Patch le reverse pour utiliser le bon host dynamique
+@api_view(['GET'])
+def api_root_custom(request, format=None):
+    codespace_name = os.environ.get('CODESPACE_NAME')
+    if codespace_name:
+        host = f"https://{codespace_name}-8000.app.github.dev"
+    else:
+        # Utilise le host de la requête (localhost ou autre)
+        host = request.build_absolute_uri('/')[:-1]
+    return Response({
+        'teams': host + reverse('team-list', request=request, format=format).replace('http://testserver', ''),
+        'users': host + reverse('user-list', request=request, format=format).replace('http://testserver', ''),
+        'activities': host + reverse('activity-list', request=request, format=format).replace('http://testserver', ''),
+        'leaderboard': host + reverse('leaderboard-list', request=request, format=format).replace('http://testserver', ''),
+        'workouts': host + reverse('workout-list', request=request, format=format).replace('http://testserver', ''),
+    })
+
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', api_root, name='api-root'),
+    path('', api_root_custom, name='api-root'),
     path('api/', include(router.urls)),
 ]
